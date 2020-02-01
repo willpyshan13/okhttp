@@ -196,6 +196,22 @@ jobs:
       - runtests:
           platform: jdk9
 
+  testjdk12windows:
+    executor:
+      name: windows/default
+      shell: bash.exe
+
+    environment:
+      JVM_OPTS: -Xmx1g
+      TERM: dumb
+
+    steps:
+      - checkout
+
+      - runtests:
+          platform: jdk9
+
+
   testjdk13:
     docker:
       - image: circleci/openjdk:13.0.2-jdk-buster
@@ -297,7 +313,8 @@ workflows:
       - testjdk12windows:
           filters:
             branches:
-              only: master
+              ignore:
+                - gh-pages
       - testjdk13:
           filters:
             branches:
