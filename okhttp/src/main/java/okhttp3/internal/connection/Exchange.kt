@@ -15,9 +15,6 @@
  */
 package okhttp3.internal.connection
 
-import java.io.IOException
-import java.net.ProtocolException
-import java.net.SocketException
 import okhttp3.EventListener
 import okhttp3.Headers
 import okhttp3.Request
@@ -32,6 +29,9 @@ import okio.ForwardingSource
 import okio.Sink
 import okio.Source
 import okio.buffer
+import java.io.IOException
+import java.net.ProtocolException
+import java.net.SocketException
 
 /**
  * Transmits a single HTTP request and a response pair. This layers connection management and events
@@ -44,10 +44,13 @@ class Exchange(
   private val codec: ExchangeCodec
 ) {
   /** Returns true if the request body need not complete before the response body starts. */
-  var isDuplex: Boolean = false
+  internal var isDuplex: Boolean = false
     private set
 
-  fun connection(): RealConnection? = codec.connection()
+  internal val connection: RealConnection = codec.connection
+
+  internal val isCoalescedConnection: Boolean
+    get() = finder.address.url.host != connection.route().address.url.host
 
   @Throws(IOException::class)
   fun writeRequestHeaders(request: Request) {
@@ -135,7 +138,7 @@ class Exchange(
   @Throws(SocketException::class)
   fun newWebSocketStreams(): RealWebSocket.Streams {
     call.timeoutEarlyExit()
-    return codec.connection()!!.newWebSocketStreams(this)
+    return codec.connection.newWebSocketStreams(this)
   }
 
   fun webSocketUpgradeFailed() {
@@ -143,7 +146,7 @@ class Exchange(
   }
 
   fun noNewExchangesOnConnection() {
-    codec.connection()!!.noNewExchanges()
+    codec.connection.noNewExchanges()
   }
 
   fun cancel() {
@@ -161,7 +164,7 @@ class Exchange(
 
   private fun trackFailure(e: IOException) {
     finder.trackFailure()
-    codec.connection()!!.trackFailure(call.client, e)
+    codec.connection.trackFailure(call.client, e)
   }
 
   fun <E : IOException?> bodyComplete(
