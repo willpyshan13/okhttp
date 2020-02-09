@@ -16,21 +16,6 @@
  */
 package okhttp3.internal.connection
 
-import java.io.IOException
-import java.lang.ref.Reference
-import java.net.ConnectException
-import java.net.HttpURLConnection.HTTP_OK
-import java.net.HttpURLConnection.HTTP_PROXY_AUTH
-import java.net.ProtocolException
-import java.net.Proxy
-import java.net.Socket
-import java.net.SocketException
-import java.net.SocketTimeoutException
-import java.net.UnknownServiceException
-import java.security.cert.X509Certificate
-import java.util.concurrent.TimeUnit.MILLISECONDS
-import javax.net.ssl.SSLPeerUnverifiedException
-import javax.net.ssl.SSLSocket
 import okhttp3.Address
 import okhttp3.Call
 import okhttp3.CertificatePinner
@@ -69,6 +54,21 @@ import okio.BufferedSource
 import okio.buffer
 import okio.sink
 import okio.source
+import java.io.IOException
+import java.lang.ref.Reference
+import java.net.ConnectException
+import java.net.HttpURLConnection.HTTP_OK
+import java.net.HttpURLConnection.HTTP_PROXY_AUTH
+import java.net.ProtocolException
+import java.net.Proxy
+import java.net.Socket
+import java.net.SocketException
+import java.net.SocketTimeoutException
+import java.net.UnknownServiceException
+import java.security.cert.X509Certificate
+import java.util.concurrent.TimeUnit.MILLISECONDS
+import javax.net.ssl.SSLPeerUnverifiedException
+import javax.net.ssl.SSLSocket
 
 class RealConnection(
   val connectionPool: RealConnectionPool,
@@ -98,6 +98,12 @@ class RealConnection(
    * Guarded by [connectionPool].
    */
   var noNewExchanges = false
+
+  /**
+   * If true, this connection may not be used for coalesced requests. These are requests that could
+   * share the same connection without sharing the same hostname.
+   */
+  var noCoalescedConnections = false
 
   /**
    * The number of times there was a problem establishing a stream that could be due to route
@@ -133,6 +139,15 @@ class RealConnection(
 
     synchronized(connectionPool) {
       noNewExchanges = true
+    }
+  }
+
+  /** Prevent this connection from being used for hosts other than the one in [route]. */
+  fun noCoalescedConnections() {
+    connectionPool.assertThreadDoesntHoldLock()
+
+    synchronized(connectionPool) {
+      noCoalescedConnections = true
     }
   }
 
@@ -559,8 +574,9 @@ class RealConnection(
     }
 
     // We have a host mismatch. But if the certificate matches, we're still good.
-    return handshake != null &&
-        OkHostnameVerifier.verify(url.host, handshake!!.peerCertificates[0] as X509Certificate)
+    return !noCoalescedConnections
+        && handshake != null
+        && OkHostnameVerifier.verify(url.host, handshake!!.peerCertificates[0] as X509Certificate)
   }
 
   @Throws(SocketException::class)
