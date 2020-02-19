@@ -107,6 +107,7 @@ class OkHttpClientTestRule : TestRule {
         Thread.setDefaultUncaughtExceptionHandler { _, throwable ->
           initUncaughtException(throwable)
         }
+        var testCompletedSuccessfully = true
         try {
           base.evaluate()
           if (uncaughtException != null) {
@@ -114,13 +115,16 @@ class OkHttpClientTestRule : TestRule {
           }
           logEventsIfFlaky(description)
         } catch (t: Throwable) {
+          testCompletedSuccessfully = false
           logEvents()
           throw t
         } finally {
           Thread.setDefaultUncaughtExceptionHandler(defaultUncaughtExceptionHandler)
-          ensureAllConnectionsReleased()
           releaseClient()
-          ensureAllTaskQueuesIdle()
+          if (testCompletedSuccessfully) {
+            ensureAllConnectionsReleased()
+            ensureAllTaskQueuesIdle()
+          }
         }
       }
 
