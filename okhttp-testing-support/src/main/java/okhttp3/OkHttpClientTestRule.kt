@@ -116,7 +116,7 @@ class OkHttpClientTestRule : TestRule {
           logEventsIfFlaky(description)
         } catch (t: Throwable) {
           testCompletedSuccessfully = false
-          logEvents()
+          logEvents(description.methodName)
           throw t
         } finally {
           Thread.setDefaultUncaughtExceptionHandler(defaultUncaughtExceptionHandler)
@@ -136,7 +136,7 @@ class OkHttpClientTestRule : TestRule {
 
   private fun logEventsIfFlaky(description: Description) {
     if (isTestFlaky(description)) {
-      logEvents()
+      logEvents(description.methodName)
     }
   }
 
@@ -145,9 +145,9 @@ class OkHttpClientTestRule : TestRule {
         description.testClass.annotations.any { it.annotationClass == Flaky::class }
   }
 
-  @Synchronized private fun logEvents() {
-    // Will be ineffective if test overrides the listener
-    println("Events (${clientEventsList.size})")
+  @Synchronized private fun logEvents(methodName: String) {
+    // Will be ineffective if test overrides the listener.
+    println("Events for $methodName (${clientEventsList.size})")
 
     for (e in clientEventsList) {
       println(e)
