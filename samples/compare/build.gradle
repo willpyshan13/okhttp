@@ -1,0 +1,15 @@
+apply plugin: 'kotlin-kapt'
+
+dependencies {
+  implementation project(':okhttp')
+  implementation project(':mockwebserver')
+  implementation project(':okhttp-tls')
+
+  testImplementation 'org.apache.httpcomponents.client5:httpclient5:5.0'
+  testImplementation deps.junit
+  testImplementation deps.assertj
+}
+
+tasks.withType(JavaCompile) {
+  options.warnings = false
+}
