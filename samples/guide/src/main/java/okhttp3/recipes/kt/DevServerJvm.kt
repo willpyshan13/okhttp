@@ -30,9 +30,7 @@ import okhttp3.internal.platform.Platform
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import okhttp3.tls.internal.TlsUtil
-import org.codehaus.mojo.animal_sniffer.IgnoreJRERequirement
 
-@IgnoreJRERequirement
 class JvmAllowlistedTrustManager(
   private val delegate: X509ExtendedTrustManager,
   private vararg val hosts: String
@@ -101,7 +99,6 @@ class JvmAllowlistedTrustManager(
   override fun getAcceptedIssuers(): Array<X509Certificate> = delegate.acceptedIssuers
 }
 
-@IgnoreJRERequirement
 class DevServerJvm {
   val handshakeCertificates = TlsUtil.localhost()
 
