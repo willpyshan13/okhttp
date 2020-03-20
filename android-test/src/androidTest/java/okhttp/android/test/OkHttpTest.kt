@@ -26,28 +26,24 @@ import okhttp3.Call
 import okhttp3.CertificatePinner
 import okhttp3.Connection
 import okhttp3.EventListener
-import okhttp3.HttpUrl.Companion.toHttpUrl
+import okhttp3.HttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.Protocol
 import okhttp3.Request
 import okhttp3.TlsVersion
 import okhttp3.dnsoverhttps.DnsOverHttps
-import okhttp3.internal.asFactory
-import okhttp3.internal.platform.Android10Platform
-import okhttp3.internal.platform.AndroidPlatform
 import okhttp3.internal.platform.Platform
 import okhttp3.logging.LoggingEventListener
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import okhttp3.tls.internal.TlsUtil.localhost
-import okio.ByteString.Companion.toByteString
+import okio.ByteString
 import org.conscrypt.Conscrypt
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Assume.assumeNoException
 import org.junit.Assume.assumeTrue
-import org.junit.BeforeClass
 import org.junit.Ignore
 import org.junit.Rule
 import org.junit.Test
@@ -57,10 +53,8 @@ import java.net.InetAddress
 import java.net.UnknownHostException
 import java.security.Security
 import java.security.cert.X509Certificate
-import javax.net.ssl.HostnameVerifier
 import javax.net.ssl.SSLPeerUnverifiedException
 import javax.net.ssl.SSLSocket
-import javax.net.ssl.X509TrustManager
 
 /**
  * Run with "./gradlew :android-test:connectedCheck" and make sure ANDROID_SDK_ROOT is set.
@@ -79,15 +73,6 @@ class OkHttpTest {
   private val handshakeCertificates = localhost()
 
   @Test
-  fun testPlatform() {
-    if (Build.VERSION.SDK_INT >= 29) {
-      assertTrue(Platform.get() is Android10Platform)
-    } else {
-      assertTrue(Platform.get() is AndroidPlatform)
-    }
-  }
-
-  @Test
   fun testRequest() {
     assumeNetwork()
 
@@ -96,7 +81,7 @@ class OkHttpTest {
     val response = client.newCall(request).execute()
 
     response.use {
-      assertEquals(200, response.code)
+      assertEquals(200, response.code())
     }
   }
 
@@ -109,7 +94,7 @@ class OkHttpTest {
     val response = client.newCall(request).execute()
 
     response.use {
-      assertEquals(200, response.code)
+      assertEquals(200, response.code())
     }
   }
 
@@ -134,8 +119,8 @@ class OkHttpTest {
       val response = client.newCall(request).execute()
 
       response.use {
-        assertEquals(Protocol.HTTP_2, response.protocol)
-        assertEquals(200, response.code)
+        assertEquals(Protocol.HTTP_2, response.protocol())
+        assertEquals(200, response.code())
         // see https://github.com/google/conscrypt/blob/b9463b2f74df42d85c73715a5f19e005dfb7b802/android/src/main/java/org/conscrypt/Platform.java#L613
         when {
             Build.VERSION.SDK_INT >= 24 -> {
@@ -148,7 +133,7 @@ class OkHttpTest {
               assertEquals("org.conscrypt.ConscryptFileDescriptorSocket", socketClass)
             }
         }
-        assertEquals(TlsVersion.TLS_1_3, response.handshake?.tlsVersion)
+        assertEquals(TlsVersion.TLS_1_3, response.handshake()?.tlsVersion())
       }
     } finally {
       Security.removeProvider("Conscrypt")
@@ -180,10 +165,10 @@ class OkHttpTest {
       val response = client.newCall(request).execute()
 
       response.use {
-        assertEquals(Protocol.HTTP_2, response.protocol)
-        assertEquals(200, response.code)
+        assertEquals(Protocol.HTTP_2, response.protocol())
+        assertEquals(200, response.code())
         assertEquals("com.google.android.gms.org.conscrypt.Java8FileDescriptorSocket", socketClass)
-        assertEquals(TlsVersion.TLS_1_2, response.handshake?.tlsVersion)
+        assertEquals(TlsVersion.TLS_1_2, response.handshake()?.tlsVersion())
       }
     } finally {
       Security.removeProvider("GmsCore_OpenSSL")
@@ -209,13 +194,13 @@ class OkHttpTest {
     val response = client.newCall(request).execute()
 
     response.use {
-      assertEquals(Protocol.HTTP_2, response.protocol)
+      assertEquals(Protocol.HTTP_2, response.protocol())
       if (Build.VERSION.SDK_INT >= 29) {
-        assertEquals(TlsVersion.TLS_1_3, response.handshake?.tlsVersion)
+        assertEquals(TlsVersion.TLS_1_3, response.handshake()?.tlsVersion())
       } else {
-        assertEquals(TlsVersion.TLS_1_2, response.handshake?.tlsVersion)
+        assertEquals(TlsVersion.TLS_1_2, response.handshake()?.tlsVersion())
       }
-      assertEquals(200, response.code)
+      assertEquals(200, response.code())
       assertTrue(socketClass?.startsWith("com.android.org.conscrypt.") == true)
     }
   }
@@ -229,7 +214,7 @@ class OkHttpTest {
     val response = client.newCall(request).execute()
 
     response.use {
-      assertEquals(200, response.code)
+      assertEquals(200, response.code())
     }
   }
 
@@ -269,10 +254,10 @@ class OkHttpTest {
     val response = client.newCall(request).execute()
 
     val results = response.use {
-      moshi.adapter(HowsMySslResults::class.java).fromJson(response.body!!.string())!!
+      moshi.adapter(HowsMySslResults::class.java).fromJson(response.body()!!.string())!!
     }
 
-    Platform.get().log("results $results", Platform.WARN)
+    Platform.get().log(Platform.WARN, "results $results", null)
 
     assertTrue(results.session_ticket_supported)
     assertEquals("Probably Okay", results.rating)
@@ -280,8 +265,8 @@ class OkHttpTest {
     assertEquals("TLS 1.3", results.tls_version)
     assertEquals(0, results.insecure_cipher_suites.size)
 
-    assertEquals(TlsVersion.TLS_1_3, response.handshake?.tlsVersion)
-    assertEquals(Protocol.HTTP_2, response.protocol)
+    assertEquals(TlsVersion.TLS_1_3, response.handshake()?.tlsVersion())
+    assertEquals(Protocol.HTTP_2, response.protocol())
   }
 
   @Test
@@ -295,12 +280,12 @@ class OkHttpTest {
     val response = client.newCall(request).execute()
 
     response.use {
-      assertEquals(200, response.code)
-      assertEquals(Protocol.HTTP_2, response.protocol)
-      val tlsVersion = response.handshake?.tlsVersion
+      assertEquals(200, response.code())
+      assertEquals(Protocol.HTTP_2, response.protocol())
+      val tlsVersion = response.handshake()?.tlsVersion()
       assertTrue(tlsVersion == TlsVersion.TLS_1_2 || tlsVersion == TlsVersion.TLS_1_3)
       assertEquals("CN=localhost",
-          (response.handshake!!.peerCertificates.first() as X509Certificate).subjectDN.name)
+          (response.handshake()!!.peerCertificates().first() as X509Certificate).subjectDN.name)
     }
   }
 
@@ -330,7 +315,7 @@ class OkHttpTest {
 
     val certificatePinner = CertificatePinner.Builder()
         .add(server.hostName,
-            CertificatePinner.pin(handshakeCertificates.trustManager.acceptedIssuers[0]))
+            CertificatePinner.pin(handshakeCertificates.trustManager().acceptedIssuers[0]))
         .build()
     client = client.newBuilder().certificatePinner(certificatePinner).build()
 
@@ -341,7 +326,7 @@ class OkHttpTest {
     val response = client.newCall(request).execute()
 
     response.use {
-      assertEquals(200, response.code)
+      assertEquals(200, response.code())
     }
   }
 
@@ -359,7 +344,7 @@ class OkHttpTest {
     val request = Request.Builder().url(server.url("/")).build()
 
     client.newCall(request).execute().use { response ->
-      assertEquals(200, response.code)
+      assertEquals(200, response.code())
     }
 
     assertEquals(listOf("CallStart", "ProxySelectStart", "ProxySelectEnd", "DnsStart", "DnsEnd",
@@ -371,7 +356,7 @@ class OkHttpTest {
     eventListener.clearAllEvents()
 
     client.newCall(request).execute().use { response ->
-      assertEquals(200, response.code)
+      assertEquals(200, response.code())
     }
 
     assertEquals(listOf("CallStart",
@@ -390,7 +375,7 @@ class OkHttpTest {
       override fun connectionAcquired(call: Call, connection: Connection) {
         val sslSocket = connection.socket() as SSLSocket
 
-        sessionIds.add(sslSocket.session.id.toByteString().hex())
+        sessionIds.add(ByteString.of(*sslSocket.session.id).hex())
       }
     }).build()
 
@@ -400,14 +385,14 @@ class OkHttpTest {
     val request = Request.Builder().url(server.url("/")).build()
 
     client.newCall(request).execute().use { response ->
-      assertEquals(200, response.code)
+      assertEquals(200, response.code())
     }
 
-    client.connectionPool.evictAll()
-    assertEquals(0, client.connectionPool.connectionCount())
+    client.connectionPool().evictAll()
+    assertEquals(0, client.connectionPool().connectionCount())
 
     client.newCall(request).execute().use { response ->
-      assertEquals(200, response.code)
+      assertEquals(200, response.code())
     }
 
     assertEquals(2, sessionIds.size)
@@ -424,69 +409,69 @@ class OkHttpTest {
 
     val dohDns = buildCloudflareIp(client)
     val dohEnabledClient =
-        client.newBuilder().eventListenerFactory(EventListener.NONE.asFactory()).dns(dohDns).build()
+        client.newBuilder().eventListener(EventListener.NONE).dns(dohDns).build()
 
     dohEnabledClient.get("https://www.twitter.com/robots.txt")
     dohEnabledClient.get("https://www.facebook.com/robots.txt")
   }
 
-  @Test
-  fun testCustomTrustManager() {
-    assumeNetwork()
-
-    val trustManager = object : X509TrustManager {
-      override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
-
-      override fun checkServerTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
-
-      override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf()
-    }
-
-    val sslContext = Platform.get().newSSLContext().apply {
-      init(null, arrayOf(trustManager), null)
-    }
-    val sslSocketFactory = sslContext.socketFactory
-
-    val hostnameVerifier = HostnameVerifier { _, _ -> true }
-
-    client = client.newBuilder()
-        .sslSocketFactory(sslSocketFactory, trustManager)
-        .hostnameVerifier(hostnameVerifier)
-        .build()
-
-    client.get("https://www.facebook.com/robots.txt")
-  }
-
-  @Test
-  fun testCustomTrustManagerWithAndroidCheck() {
-    assumeNetwork()
-
-    val trustManager = object : X509TrustManager {
-      override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
-
-      override fun checkServerTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
-
-      @Suppress("unused", "UNUSED_PARAMETER")
-      // called by Android via reflection in X509TrustManagerExtensions
-      fun checkServerTrusted(chain: Array<out X509Certificate>, authType: String, hostname: String) = chain.toList()
-
-      override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf()
-    }
-
-    val sslContext = Platform.get().newSSLContext().apply {
-      init(null, arrayOf(trustManager), null)
-    }
-    val sslSocketFactory = sslContext.socketFactory
-
-    val hostnameVerifier = HostnameVerifier { _, _ -> true }
-
-    client = client.newBuilder()
-        .sslSocketFactory(sslSocketFactory, trustManager)
-        .hostnameVerifier(hostnameVerifier)
-        .build()
-
-    client.get("https://www.facebook.com/robots.txt")
-  }
+//  @Test
+//  fun testCustomTrustManager() {
+//    assumeNetwork()
+//
+//    val trustManager = object : X509TrustManager {
+//      override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
+//
+//      override fun checkServerTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
+//
+//      override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf()
+//    }
+//
+//    val sslContext = Platform.get().newSSLContext().apply {
+//      init(null, arrayOf(trustManager), null)
+//    }
+//    val sslSocketFactory = sslContext.socketFactory
+//
+//    val hostnameVerifier = HostnameVerifier { _, _ -> true }
+//
+//    client = client.newBuilder()
+//        .sslSocketFactory(sslSocketFactory, trustManager)
+//        .hostnameVerifier(hostnameVerifier)
+//        .build()
+//
+//    client.get("https://www.facebook.com/robots.txt")
+//  }
+//
+//  @Test
+//  fun testCustomTrustManagerWithAndroidCheck() {
+//    assumeNetwork()
+//
+//    val trustManager = object : X509TrustManager {
+//      override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
+//
+//      override fun checkServerTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
+//
+//      @Suppress("unused", "UNUSED_PARAMETER")
+//      // called by Android via reflection in X509TrustManagerExtensions
+//      fun checkServerTrusted(chain: Array<out X509Certificate>, authType: String, hostname: String) = chain.toList()
+//
+//      override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf()
+//    }
+//
+//    val sslContext = Platform.get().newSSLContext().apply {
+//      init(null, arrayOf(trustManager), null)
+//    }
+//    val sslSocketFactory = sslContext.socketFactory
+//
+//    val hostnameVerifier = HostnameVerifier { _, _ -> true }
+//
+//    client = client.newBuilder()
+//        .sslSocketFactory(sslSocketFactory, trustManager)
+//        .hostnameVerifier(hostnameVerifier)
+//        .build()
+//
+//    client.get("https://www.facebook.com/robots.txt")
+//  }
 
   @Test
   fun testUnderscoreRequest() {
@@ -510,20 +495,20 @@ class OkHttpTest {
     val response = this.newCall(request).execute()
 
     response.use {
-      assertEquals(200, response.code)
+      assertEquals(200, response.code())
     }
   }
 
   fun buildCloudflareIp(bootstrapClient: OkHttpClient): DnsOverHttps {
     return DnsOverHttps.Builder().client(bootstrapClient)
-        .url("https://1.1.1.1/dns-query".toHttpUrl())
+        .url(HttpUrl.get("https://1.1.1.1/dns-query"))
         .build()
   }
 
   private fun enableTls() {
     client = client.newBuilder()
         .sslSocketFactory(
-            handshakeCertificates.sslSocketFactory(), handshakeCertificates.trustManager)
+            handshakeCertificates.sslSocketFactory(), handshakeCertificates.trustManager())
         .build()
     server.useHttps(handshakeCertificates.sslSocketFactory(), false)
   }
@@ -533,15 +518,6 @@ class OkHttpTest {
       InetAddress.getByName("www.google.com")
     } catch (uhe: UnknownHostException) {
       assumeNoException(uhe)
-    }
-  }
-
-  companion object {
-    @BeforeClass
-    @JvmStatic
-    fun hookLogging() {
-      OkHttpDebugLogcat.enableHttp2()
-      OkHttpDebugLogcat.enableTaskRunner()
     }
   }
 }
