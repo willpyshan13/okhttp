@@ -19,27 +19,26 @@ import android.os.Build
 import android.support.test.InstrumentationRegistry
 import android.support.test.runner.AndroidJUnit4
 import com.google.android.gms.common.GooglePlayServicesNotAvailableException
+import com.google.android.gms.security.ProviderInstaller
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
-import com.google.android.gms.security.ProviderInstaller
 import okhttp3.Call
 import okhttp3.CertificatePinner
 import okhttp3.Connection
 import okhttp3.EventListener
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
-import okhttp3.OkHttpClientTestRule
 import okhttp3.Protocol
-import okhttp3.RecordingEventListener
 import okhttp3.Request
 import okhttp3.TlsVersion
 import okhttp3.dnsoverhttps.DnsOverHttps
 import okhttp3.internal.asFactory
+import okhttp3.internal.platform.Android10Platform
+import okhttp3.internal.platform.AndroidPlatform
 import okhttp3.internal.platform.Platform
 import okhttp3.logging.LoggingEventListener
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
-import okhttp3.testing.PlatformRule
 import okhttp3.tls.internal.TlsUtil.localhost
 import okio.ByteString.Companion.toByteString
 import org.conscrypt.Conscrypt
@@ -53,36 +52,22 @@ import org.junit.Ignore
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import java.io.IOException
 import java.net.InetAddress
 import java.net.UnknownHostException
-import java.security.cert.X509Certificate
 import java.security.Security
+import java.security.cert.X509Certificate
 import javax.net.ssl.HostnameVerifier
 import javax.net.ssl.SSLPeerUnverifiedException
 import javax.net.ssl.SSLSocket
 import javax.net.ssl.X509TrustManager
-import java.util.logging.Logger
-import okhttp3.internal.platform.AndroidPlatform
-import okhttp3.internal.platform.Android10Platform
-import java.io.IOException
-import java.lang.IllegalArgumentException
 
 /**
  * Run with "./gradlew :android-test:connectedCheck" and make sure ANDROID_SDK_ROOT is set.
  */
 @RunWith(AndroidJUnit4::class)
 class OkHttpTest {
-  @Suppress("RedundantVisibilityModifier")
-  @JvmField
-  @Rule public val platform = PlatformRule()
-
-  @Suppress("RedundantVisibilityModifier")
-  @JvmField
-  @Rule public val clientTestRule = OkHttpClientTestRule().apply {
-    logger = Logger.getLogger(OkHttpTest::class.java.name)
-  }
-
-  private var client = clientTestRule.newClient()
+  private var client = OkHttpClient()
 
   private val moshi = Moshi.Builder()
       .add(KotlinJsonAdapterFactory())
@@ -140,11 +125,11 @@ class OkHttpTest {
       var socketClass: String? = null
 
       // Need fresh client to reset sslSocketFactoryOrNull
-      client = OkHttpClient.Builder().eventListenerFactory(clientTestRule.wrap(object : EventListener() {
+      client = OkHttpClient.Builder().eventListener(object : EventListener() {
         override fun connectionAcquired(call: Call, connection: Connection) {
           socketClass = connection.socket().javaClass.name
         }
-      })).build()
+      }).build()
 
       val response = client.newCall(request).execute()
 
@@ -186,11 +171,11 @@ class OkHttpTest {
       var socketClass: String? = null
 
       // Need fresh client to reset sslSocketFactoryOrNull
-      client = OkHttpClient.Builder().eventListenerFactory(clientTestRule.wrap(object : EventListener() {
+      client = OkHttpClient.Builder().eventListener(object : EventListener() {
         override fun connectionAcquired(call: Call, connection: Connection) {
           socketClass = connection.socket().javaClass.name
         }
-      })).build()
+      }).build()
 
       val response = client.newCall(request).execute()
 
@@ -214,11 +199,11 @@ class OkHttpTest {
     var socketClass: String? = null
 
     client = client.newBuilder()
-        .eventListenerFactory(clientTestRule.wrap(object : EventListener() {
+        .eventListener(object : EventListener() {
           override fun connectionAcquired(call: Call, connection: Connection) {
             socketClass = connection.socket().javaClass.name
           }
-        }))
+        })
         .build()
 
     val response = client.newCall(request).execute()
@@ -366,7 +351,7 @@ class OkHttpTest {
 
     enableTls()
 
-    client = client.newBuilder().eventListenerFactory(clientTestRule.wrap(eventListener)).build()
+    client = client.newBuilder().eventListener(eventListener).build()
 
     server.enqueue(MockResponse().setBody("abc1"))
     server.enqueue(MockResponse().setBody("abc2"))
@@ -401,13 +386,13 @@ class OkHttpTest {
 
     enableTls()
 
-    client = client.newBuilder().eventListenerFactory(clientTestRule.wrap(object : EventListener() {
+    client = client.newBuilder().eventListener(object : EventListener() {
       override fun connectionAcquired(call: Call, connection: Connection) {
         val sslSocket = connection.socket() as SSLSocket
 
         sessionIds.add(sslSocket.session.id.toByteString().hex())
       }
-    })).build()
+    }).build()
 
     server.enqueue(MockResponse().setBody("abc1"))
     server.enqueue(MockResponse().setBody("abc2"))
@@ -434,7 +419,7 @@ class OkHttpTest {
     assumeNetwork()
 
     client = client.newBuilder()
-        .eventListenerFactory(clientTestRule.wrap(LoggingEventListener.Factory()))
+        .eventListenerFactory(LoggingEventListener.Factory())
         .build()
 
     val dohDns = buildCloudflareIp(client)
