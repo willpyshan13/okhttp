@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014 Square, Inc.
+ * Copyright (C) 2020 Square, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-@file:JvmName("Version")
-package okhttp3.internal
+package okhttp3
 
-const val userAgent = "okhttp/$projectVersion"
+import org.assertj.core.api.Assertions.assertThat
+import org.junit.Test
+
+class OkHttpTest {
+  @Test
+  fun testVersion() {
+    assertThat(OkHttp.VERSION).matches("[0-9]+\\.[0-9]+\\.[0-9]+(-.+)?")
+  }
+}
